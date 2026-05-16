@@ -26,6 +26,7 @@ const keys = new Set();
 const touchDirs = new Set();
 let fireHeld = false;
 let lastTime = 0;
+let audioCtx = null;
 
 const state = {
   running: false,
@@ -45,6 +46,67 @@ const state = {
   particles: [],
   base: { x: 12 * TILE, y: 24 * TILE, w: 2 * TILE, h: 2 * TILE, alive: true }
 };
+
+function unlockAudio() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return;
+  if (!audioCtx) audioCtx = new AudioContextClass();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+}
+
+function playTone(freq, duration = 0.08, type = "square", volume = 0.08, endFreq = freq) {
+  if (!audioCtx) return;
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, now);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(1, endFreq), now + duration);
+  gain.gain.setValueAtTime(volume, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now + duration);
+}
+
+function playNoise(duration = 0.18, volume = 0.12) {
+  if (!audioCtx) return;
+  const now = audioCtx.currentTime;
+  const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * duration, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i += 1) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+  const source = audioCtx.createBufferSource();
+  const gain = audioCtx.createGain();
+  source.buffer = buffer;
+  gain.gain.setValueAtTime(volume, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+  source.connect(gain).connect(audioCtx.destination);
+  source.start(now);
+}
+
+function sound(name) {
+  if (!audioCtx) return;
+  if (name === "shoot") playTone(420, 0.07, "square", 0.07, 170);
+  if (name === "enemyShoot") playTone(260, 0.08, "square", 0.045, 120);
+  if (name === "wall") playTone(130, 0.05, "triangle", 0.055, 80);
+  if (name === "start") {
+    playTone(330, 0.08, "triangle", 0.06, 420);
+    setTimeout(() => playTone(520, 0.1, "triangle", 0.065, 620), 75);
+  }
+  if (name === "pause") playTone(210, 0.08, "sine", 0.055, 210);
+  if (name === "explode") {
+    playNoise(0.22, 0.12);
+    playTone(95, 0.2, "sawtooth", 0.06, 42);
+  }
+  if (name === "gameOver") {
+    playTone(220, 0.12, "triangle", 0.06, 160);
+    setTimeout(() => playTone(140, 0.18, "triangle", 0.06, 80), 110);
+  }
+  if (name === "victory") {
+    playTone(440, 0.08, "triangle", 0.06, 520);
+    setTimeout(() => playTone(660, 0.12, "triangle", 0.06, 760), 90);
+  }
+}
 
 function rectsHit(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -101,6 +163,7 @@ function buildMap() {
 }
 
 function startGame() {
+  sound("start");
   state.running = true;
   state.paused = false;
   state.over = false;
@@ -121,7 +184,7 @@ function startLevel() {
   state.enemiesTotal = 8 + state.level * 3;
   state.enemiesLeft = state.enemiesTotal;
   state.spawnTimer = 0;
-  ui.message.textContent = `Level ${state.level}`;
+  ui.message.textContent = `第 ${state.level} 关`;
   syncHud();
 }
 
@@ -134,7 +197,8 @@ function endGame(won = false) {
   state.over = true;
   state.running = false;
   state.won = won;
-  ui.message.textContent = won ? "Victory" : "Game Over";
+  ui.message.textContent = won ? "胜利" : "游戏结束";
+  sound(won ? "victory" : "gameOver");
 }
 
 function syncHud() {
@@ -142,7 +206,7 @@ function syncHud() {
   ui.level.textContent = state.level;
   ui.lives.textContent = state.lives;
   ui.enemies.textContent = state.enemiesLeft + state.enemies.length;
-  if (!state.running && !state.over) ui.message.textContent = "Press Enter";
+  if (!state.running && !state.over) ui.message.textContent = "按回车开始";
 }
 
 function spawnEnemy() {
@@ -207,6 +271,7 @@ function shoot(tank) {
     speed: tank.kind === "player" ? 310 : 215
   });
   tank.reload = tank.kind === "player" ? 0.35 : 0.9;
+  sound(tank.kind === "player" ? "shoot" : "enemyShoot");
 }
 
 function updatePlayer(dt) {
@@ -258,6 +323,7 @@ function destroyPlayer() {
   const player = state.player;
   if (!player || player.invincible > 0) return;
   pop(player.x + player.w / 2, player.y + player.h / 2, "#f2d25c");
+  sound("explode");
   state.lives -= 1;
   if (state.lives <= 0) {
     endGame(false);
@@ -285,6 +351,7 @@ function updateBullets(dt) {
       const wall = state.walls[wallIndex];
       if (wall.type === "brick") state.walls.splice(wallIndex, 1);
       pop(bullet.x + 4, bullet.y + 4, wall.type === "brick" ? "#b86a42" : "#bec7c7");
+      sound("wall");
       remove.add(i);
       return;
     }
@@ -292,6 +359,7 @@ function updateBullets(dt) {
     if (state.base.alive && rectsHit(bullet, state.base)) {
       state.base.alive = false;
       pop(state.base.x + state.base.w / 2, state.base.y + state.base.h / 2, "#e66d58");
+      sound("explode");
       remove.add(i);
       endGame(false);
       return;
@@ -304,6 +372,7 @@ function updateBullets(dt) {
         state.enemies.splice(hitIndex, 1);
         state.score += 100;
         pop(enemy.x + enemy.w / 2, enemy.y + enemy.h / 2, "#e66d58");
+        sound("explode");
         remove.add(i);
       }
     } else if (state.player && rectsHit(bullet, state.player)) {
@@ -429,10 +498,10 @@ function drawOverlay() {
   ctx.fillStyle = "#e6c84f";
   ctx.font = "bold 34px Trebuchet MS, Arial";
   ctx.textAlign = "center";
-  ctx.fillText(state.paused ? "PAUSED" : (state.over ? (state.won ? "VICTORY" : "GAME OVER") : "TANK BATTLE"), canvas.width / 2, canvas.height / 2 - 12);
+  ctx.fillText(state.paused ? "已暂停" : (state.over ? (state.won ? "胜利" : "游戏结束") : "坦克大战"), canvas.width / 2, canvas.height / 2 - 12);
   ctx.fillStyle = "#f6f0d0";
   ctx.font = "18px Trebuchet MS, Arial";
-  ctx.fillText("Press Enter", canvas.width / 2, canvas.height / 2 + 24);
+  ctx.fillText("按回车继续", canvas.width / 2, canvas.height / 2 + 24);
 }
 
 function render() {
@@ -455,6 +524,7 @@ function loop(time) {
 }
 
 window.addEventListener("keydown", event => {
+  unlockAudio();
   if (["ArrowUp", "ArrowRight", "ArrowDown", "ArrowLeft", "Space"].includes(event.code)) event.preventDefault();
   if (event.code === "Enter") {
     if (!state.running || state.over) startGame();
@@ -462,7 +532,8 @@ window.addEventListener("keydown", event => {
   }
   if (event.code === "KeyP" && state.running) {
     state.paused = !state.paused;
-    ui.message.textContent = state.paused ? "Paused" : `Level ${state.level}`;
+    ui.message.textContent = state.paused ? "已暂停" : `第 ${state.level} 关`;
+    sound("pause");
     return;
   }
   keys.add(event.code);
@@ -476,6 +547,7 @@ document.querySelectorAll("[data-dir]").forEach(button => {
   const dir = button.dataset.dir;
   button.addEventListener("pointerdown", event => {
     event.preventDefault();
+    unlockAudio();
     button.setPointerCapture(event.pointerId);
     touchDirs.add(dir);
   });
@@ -485,6 +557,7 @@ document.querySelectorAll("[data-dir]").forEach(button => {
 
 document.querySelector("[data-action='fire']").addEventListener("pointerdown", event => {
   event.preventDefault();
+  unlockAudio();
   fireHeld = true;
 });
 document.querySelector("[data-action='fire']").addEventListener("pointerup", () => {
