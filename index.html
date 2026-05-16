@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tank Battle HTML</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="game-frame" aria-label="Tank Battle game">
+      <canvas id="game" width="624" height="624" aria-label="Tank Battle battlefield"></canvas>
+      <div class="mobile-controls" aria-label="Touch controls">
+        <button class="pad up" data-dir="up" aria-label="Up">▲</button>
+        <button class="pad left" data-dir="left" aria-label="Left">◀</button>
+        <button class="pad down" data-dir="down" aria-label="Down">▼</button>
+        <button class="pad right" data-dir="right" aria-label="Right">▶</button>
+        <button class="fire" data-action="fire" aria-label="Fire">●</button>
+      </div>
+    </section>
+
+    <aside class="hud" aria-label="Game status">
+      <h1>Tank Battle</h1>
+      <dl class="stats">
+        <div><dt>Score</dt><dd id="score">0</dd></div>
+        <div><dt>Level</dt><dd id="level">1</dd></div>
+        <div><dt>Lives</dt><dd id="lives">3</dd></div>
+        <div><dt>Enemies</dt><dd id="enemies">0</dd></div>
+      </dl>
+
+      <p id="message" class="message">Press Enter</p>
+
+      <div class="keys" aria-label="Keyboard controls">
+        <span>WASD / Arrows</span>
+        <span>Space</span>
+        <span>P</span>
+        <span>Enter</span>
+      </div>
+    </aside>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>

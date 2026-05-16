@@ -1,0 +1,34 @@
+# Tank Battle HTML
+
+一个纯前端 HTML5 Canvas 坦克大战小游戏。项目没有构建步骤和外部依赖，直接打开 `index.html` 就能运行。
+
+## Features
+
+- 玩家坦克移动、射击、生命和短暂无敌重生
+- 敌方坦克生成、简单追踪 AI 和自动射击
+- 砖墙可破坏，钢墙不可破坏
+- 基地防守、分数、关卡、暂停、胜负状态
+- 键盘和移动端触控按钮
+
+## Controls
+
+- `WASD` 或方向键：移动
+- `Space`：射击
+- `P`：暂停
+- `Enter`：开始或重新开始
+
+## Run
+
+双击打开 `index.html`，或在任意静态服务器中打开项目目录。
+
+```powershell
+python -m http.server 8080
+```
+
+然后访问 `http://localhost:8080`。
+
+## Files
+
+- `index.html`：页面入口
+- `styles.css`：布局和街机风格样式
+- `game.js`：游戏逻辑、碰撞、AI 和渲染
